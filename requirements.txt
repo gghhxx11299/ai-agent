@@ -7,6 +7,11 @@ python-dotenv>=1.0.0        # Environment configuration
 # Web Search (Free - No API key needed!)
 ddgs>=1.0.0                 # DuckDuckGo web search (renamed package)
 
+# Web API (Flask)
+Flask>=3.0.0                # Web framework for REST API
+flask-cors>=4.0.0           # CORS support for API
+gunicorn>=21.0.0            # Production WSGI server
+
 # Terminal UI
 rich>=13.7.0                # Rich terminal formatting
 colorama>=0.4.6             # Color support
