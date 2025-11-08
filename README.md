@@ -99,14 +99,57 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 ### 3. Run the Agent
 
+**Option A: Terminal Interface (Local)**
 ```bash
 python main.py
 ```
 
 Or with debug mode:
-
 ```bash
 python main.py --debug
+```
+
+**Option B: Web API (Local or Production)**
+```bash
+python api.py
+```
+API will be available at `http://localhost:5000`
+
+## 🌐 Deployment to Production
+
+### Deploy to Render.com (Recommended)
+
+This project includes a **Flask API** (`api.py`) ready for production deployment!
+
+**Quick Deploy:**
+1. Push your code to GitHub
+2. Go to [Render Dashboard](https://dashboard.render.com/)
+3. Create new Web Service
+4. Connect your repository
+5. Use these settings:
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `gunicorn api:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2`
+6. Add environment variables (at least one AI API key)
+7. Deploy!
+
+**📖 Full deployment guide:** See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+### API Endpoints
+
+Once deployed, your API will have these endpoints:
+
+- `GET /` - API information and documentation
+- `GET /health` - Health check
+- `GET /status` - System status
+- `GET /models` - List available AI models
+- `POST /query` - Send a query to the AI
+- `POST /chat` - Chat with the AI (alias)
+
+**Example API Usage:**
+```bash
+curl -X POST https://your-app.onrender.com/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the weather in London?"}'
 ```
 
 ## 💬 Usage
@@ -174,17 +217,22 @@ multi-ai-agent/
 │   │   ├── gemini.py          # Gemini AI integration
 │   │   ├── groq.py            # Groq AI integration
 │   │   ├── openrouter.py      # OpenRouter AI integration
-│   │   ├── poe.py             # Poe API for web search
+│   │   ├── web_search.py      # DuckDuckGo web search
 │   │   └── regional_data.py   # Weather, agriculture, satellite data
 │   ├── utils/
 │   │   └── code_generator.py  # PyQGIS script generation
 │   └── orchestrator.py        # Main orchestration with AI fallback
 ├── config/
 │   └── config.py              # Configuration management
-├── main.py                    # Terminal interface
+├── main.py                    # Terminal interface (local use)
+├── api.py                     # Flask REST API (production)
 ├── requirements.txt           # Python dependencies
+├── Procfile                   # Render/Heroku deployment config
+├── render.yaml                # Render infrastructure as code
+├── start.sh                   # Production startup script
 ├── .env.example               # Environment variables template
-└── README.md
+├── DEPLOYMENT.md              # Deployment guide
+└── README.md                  # This file
 ```
 
 ## 🔧 Configuration
