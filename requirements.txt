@@ -1,0 +1,15 @@
+# AI Model Dependencies
+google-generativeai>=0.3.0  # Gemini (Primary AI)
+groq>=0.4.0                 # Groq (Fallback AI #1)
+requests>=2.31.0            # OpenRouter API calls (Fallback AI #2)
+python-dotenv>=1.0.0        # Environment configuration
+
+# Web Search (Free - No API key needed!)
+ddgs>=1.0.0                 # DuckDuckGo web search (renamed package)
+
+# Terminal UI
+rich>=13.7.0                # Rich terminal formatting
+colorama>=0.4.6             # Color support
+
+# Utilities
+python-dateutil>=2.8.2      # Date/time utilities
