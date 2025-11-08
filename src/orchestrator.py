@@ -7,7 +7,7 @@ from rich import print as rprint
 from src.integrations.gemini import GeminiIntegration
 from src.integrations.groq import GroqIntegration
 from src.integrations.openrouter import OpenRouterIntegration
-from src.integrations.poe import PoeIntegration
+from src.integrations.web_search import WebSearchIntegration
 from src.integrations.regional_data import RegionalDataIntegration
 from config.config import Config
 
@@ -57,7 +57,7 @@ class Orchestrator:
         else:
             raise Exception("No AI models available. Please configure at least one API key (Gemini, Groq, or OpenRouter)")
 
-        self.poe = PoeIntegration()
+        self.web_search = WebSearchIntegration()  # Uses DuckDuckGo for real-time web search
         self.regional_data = RegionalDataIntegration()
 
     async def _safe_ai_call(self, method_name: str, *args, **kwargs):
@@ -168,16 +168,16 @@ The script is fully commented and ready to use. Would you like me to explain any
             'sources': {}
         }
 
-        # Fetch web search results if needed (Poe serves as Gemini's real-time data source)
+        # Fetch web search results if needed (DuckDuckGo for real-time data)
         if analysis.get('needsWebSearch'):
             keywords = analysis.get('searchKeywords', analysis.get('keywords', [query]))
             with console.status(f"🔍 Searching the web for: {', '.join(keywords)}..."):
                 try:
-                    search_results = await self.poe.search(query, keywords)
+                    search_results = await self.web_search.search(query, keywords)
                     aggregated_data['sources']['webSearch'] = search_results
 
                     if search_results.get('mock'):
-                        console.print("[yellow]⚠️  Using mock web search (install duckduckgo-search for real results)[/yellow]")
+                        console.print("[yellow]⚠️  Using mock web search (install 'ddgs' package for real results: pip install ddgs)[/yellow]")
                     else:
                         console.print("[green]✓[/green] Found up-to-date information")
                 except Exception as e:

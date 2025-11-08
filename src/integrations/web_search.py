@@ -10,7 +10,7 @@ except ImportError:
     print("⚠️  ddgs not installed. Install with: pip install ddgs")
 
 
-class PoeIntegration:
+class WebSearchIntegration:
     """Web search integration using DuckDuckGo (free, no API key needed)"""
 
     def __init__(self):
@@ -116,3 +116,7 @@ class PoeIntegration:
         """
         query = f"latest news about {topic}"
         return await self.search(query, ['news', 'recent', 'update'])
+
+
+# Backward compatibility alias (Poe has been replaced with DuckDuckGo)
+PoeIntegration = WebSearchIntegration

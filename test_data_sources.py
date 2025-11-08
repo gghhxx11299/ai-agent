@@ -4,7 +4,7 @@
 import asyncio
 from rich.console import Console
 from rich.table import Table
-from src.integrations.poe import PoeIntegration
+from src.integrations.web_search import WebSearchIntegration
 from src.integrations.regional_data import RegionalDataIntegration
 
 console = Console()
@@ -16,8 +16,8 @@ async def test_web_search():
     console.print("Testing real-time web search capabilities...\n")
 
     try:
-        poe = PoeIntegration()
-        result = await poe.search("latest AI developments 2025", ["artificial intelligence", "2025"])
+        web_search = WebSearchIntegration()
+        result = await web_search.search("latest AI developments 2025", ["artificial intelligence", "2025"])
 
         if result['success']:
             console.print("[green]✓ Web search working![/green]")

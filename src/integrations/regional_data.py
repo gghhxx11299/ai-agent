@@ -36,7 +36,12 @@ class RegionalDataIntegration:
                 timeout=10
             )
             response.raise_for_status()
-            data = response.json()
+
+            # Safe JSON parsing with EOF error handling
+            try:
+                data = response.json()
+            except (ValueError, EOFError) as json_err:
+                raise ValueError(f'Failed to parse geocoding response: {json_err}')
 
             if not data.get('results'):
                 raise ValueError(f'Location "{location}" not found')
@@ -49,6 +54,10 @@ class RegionalDataIntegration:
                 'country': result.get('country', ''),
                 'admin1': result.get('admin1', '')
             }
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f'Geocoding request failed: {e}')
+        except (KeyError, IndexError) as e:
+            raise ValueError(f'Invalid geocoding response format: {e}')
         except Exception as e:
             raise ValueError(f'Geocoding failed: {e}')
 
@@ -118,7 +127,15 @@ class RegionalDataIntegration:
                 timeout=15
             )
             response.raise_for_status()
-            data = response.json()
+
+            # Safe JSON parsing with EOF error handling
+            try:
+                data = response.json()
+            except (ValueError, EOFError) as json_err:
+                raise Exception(f'Failed to parse weather API response: {json_err}')
+
+            if 'current' not in data or 'hourly' not in data:
+                raise Exception('Invalid weather API response format')
 
             current = data['current']
             hourly = data['hourly']
@@ -191,13 +208,23 @@ class RegionalDataIntegration:
             )
             response.raise_for_status()
 
+            # Safe JSON parsing with EOF error handling
+            try:
+                data = response.json()
+            except (ValueError, EOFError) as json_err:
+                print(f"Failed to parse agriculture API response: {json_err}")
+                return self._mock_agricultural_data(location, crop_type)
+
             return {
                 'success': True,
                 'location': location,
-                'data': response.json(),
+                'data': data,
                 'timestamp': datetime.now().isoformat()
             }
 
+        except requests.exceptions.RequestException as e:
+            print(f"Agriculture API request error: {e}")
+            return self._mock_agricultural_data(location, crop_type)
         except Exception as e:
             print(f"Agriculture API error: {e}")
             return self._mock_agricultural_data(location, crop_type)

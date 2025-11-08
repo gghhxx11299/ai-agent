@@ -36,8 +36,21 @@ class OpenRouterIntegration:
                 timeout=30
             )
             response.raise_for_status()
-            data = response.json()
+
+            # Safe JSON parsing with EOF error handling
+            try:
+                data = response.json()
+            except (ValueError, EOFError) as json_err:
+                raise Exception(f"Failed to parse API response: {json_err}")
+
+            if 'choices' not in data or not data['choices']:
+                raise Exception("Invalid API response: missing choices")
+
             return data['choices'][0]['message']['content']
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"OpenRouter API request error: {e}")
+        except (KeyError, IndexError) as e:
+            raise Exception(f"OpenRouter API response format error: {e}")
         except Exception as e:
             raise Exception(f"OpenRouter API error: {e}")
 

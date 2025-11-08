@@ -276,14 +276,20 @@ def save_script(script: str, output_dir: str = 'generated_scripts') -> str:
         Path to saved file
     """
     # Create output directory if it doesn't exist
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    try:
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError) as e:
+        raise Exception(f"Failed to create output directory: {e}")
 
     # Generate filename with timestamp
     filename = f"satellite_processing_{int(datetime.now().timestamp())}.py"
     filepath = os.path.join(output_dir, filename)
 
-    # Write script to file
-    with open(filepath, 'w') as f:
-        f.write(script)
+    # Write script to file with proper error handling
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(script)
+    except (IOError, OSError, EOFError) as e:
+        raise Exception(f"Failed to write script file: {e}")
 
     return filepath
