@@ -7,9 +7,6 @@ A conversational AI assistant with real-time capabilities
 import asyncio
 import sys
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich import print as rprint
 from config.config import validate_config
 from src.orchestrator import Orchestrator
 
@@ -117,10 +114,14 @@ async def main():
             response = await orchestrator.process_query(user_input)
 
             # Display Gemini's response
-            console.print("\n[bold cyan]✨ Gemini:[/bold cyan]\n")
+            console.print("\n[bold cyan]✨ AI:[/bold cyan]\n")
             console.print(response)
             console.print()
 
+        except EOFError:
+            # Handle EOF (when stdin is closed or Ctrl+D is pressed)
+            console.print("\n\n[yellow]👋 Goodbye! (EOF detected)[/yellow]\n")
+            break
         except KeyboardInterrupt:
             console.print("\n\n[yellow]👋 Goodbye![/yellow]\n")
             break
@@ -128,6 +129,8 @@ async def main():
             console.print(f"\n[red]❌ Sorry, I encountered an error: {e}[/red]\n")
             if '--debug' in sys.argv:
                 console.print_exception()
+            # Don't break on general exceptions, allow retry
+            continue
 
 
 if __name__ == "__main__":
