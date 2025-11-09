@@ -2,7 +2,7 @@
 
 import json
 import re
-import requests
+import httpx
 from config.config import Config
 
 
@@ -19,9 +19,10 @@ class OpenRouterIntegration:
             "HTTP-Referer": "https://github.com/multi-ai-agent",
             "X-Title": "Multi AI Agent"
         }
+        self.client = httpx.AsyncClient(timeout=30.0)
 
-    def _make_request(self, prompt: str, temperature: float = 0.7) -> str:
-        """Make a request to OpenRouter API"""
+    async def _make_request(self, prompt: str, temperature: float = 0.7) -> str:
+        """Make an async request to OpenRouter API"""
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -29,30 +30,37 @@ class OpenRouterIntegration:
         }
 
         try:
-            response = requests.post(
+            response = await self.client.post(
                 self.api_url,
                 headers=self.headers,
-                json=payload,
-                timeout=30
+                json=payload
             )
             response.raise_for_status()
 
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError) as json_err:
+            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
                 raise Exception(f"Failed to parse API response: {json_err}")
 
             if 'choices' not in data or not data['choices']:
                 raise Exception("Invalid API response: missing choices")
 
             return data['choices'][0]['message']['content']
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             raise Exception(f"OpenRouter API request error: {e}")
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"OpenRouter API HTTP error: {e.response.status_code} - {e.response.text}")
         except (KeyError, IndexError) as e:
             raise Exception(f"OpenRouter API response format error: {e}")
         except Exception as e:
             raise Exception(f"OpenRouter API error: {e}")
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
 
     async def analyze_query(self, query: str) -> dict:
         """
@@ -96,7 +104,7 @@ Return ONLY a JSON object in this exact format:
 }}"""
 
         try:
-            text = self._make_request(prompt, temperature=0.3)
+            text = await self._make_request(prompt, temperature=0.3)
 
             # Extract JSON from response (handling markdown code blocks)
             json_match = re.search(r'\{[\s\S]*\}', text)
@@ -185,7 +193,7 @@ The user asked: "{query}"
 Provide your response in a natural, friendly way:"""
 
         try:
-            return self._make_request(prompt, temperature=0.7)
+            return await self._make_request(prompt, temperature=0.7)
         except Exception as e:
             print(f"Error synthesizing response with OpenRouter: {e}")
             return f"I encountered an error while processing your query: {e}"
@@ -209,7 +217,7 @@ Provide a natural, conversational response as if you're having a friendly chat. 
 Your response:"""
 
         try:
-            return self._make_request(prompt, temperature=0.7)
+            return await self._make_request(prompt, temperature=0.7)
         except Exception as e:
             print(f"Error in direct answer with OpenRouter: {e}")
             return f"I'm sorry, I encountered an error while processing your question: {e}"

@@ -1,7 +1,7 @@
 # AI Model Dependencies
 google-generativeai>=0.3.0  # Gemini (Primary AI)
 groq>=0.4.0                 # Groq (Fallback AI #1)
-requests>=2.31.0            # OpenRouter API calls (Fallback AI #2)
+httpx>=0.24.0               # Async HTTP client for API calls
 python-dotenv>=1.0.0        # Environment configuration
 
 # Web Search (Free - No API key needed!)

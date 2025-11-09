@@ -86,12 +86,12 @@ class WebSearchIntegration:
             'success': True,
             'query': query,
             'results': {
-                'summary': f'Mock search results for: "{query}". Configure Poe API key for real search results.',
+                'summary': f'Mock search results for: "{query}". Install "ddgs" package for real search results (pip install ddgs).',
                 'sources': [
                     {
                         'title': 'Example Source 1',
                         'url': 'https://example.com/1',
-                        'snippet': 'This is a mock search result. Real results will appear when Poe API is configured.'
+                        'snippet': 'This is a mock search result. Real results will appear when ddgs package is installed (pip install ddgs).'
                     },
                     {
                         'title': 'Example Source 2',

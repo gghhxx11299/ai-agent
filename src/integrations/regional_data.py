@@ -1,6 +1,7 @@
 """Regional data integration for weather, agriculture, and satellite data"""
 
-import requests
+import httpx
+import json
 from datetime import datetime
 from config.config import Config
 
@@ -13,8 +14,9 @@ class RegionalDataIntegration:
         self.geocoding_url = Config.GEOCODING_URL
         self.agriculture_api_key = Config.AGRICULTURE_API_KEY
         self.agriculture_api_url = Config.AGRICULTURE_API_URL
+        self.client = httpx.AsyncClient(timeout=15.0)
 
-    def _geocode_location(self, location: str) -> dict:
+    async def _geocode_location(self, location: str) -> dict:
         """
         Geocode a location name to coordinates using Open-Meteo
 
@@ -25,22 +27,21 @@ class RegionalDataIntegration:
             Dictionary with coordinates and location info
         """
         try:
-            response = requests.get(
+            response = await self.client.get(
                 self.geocoding_url,
                 params={
                     'name': location,
                     'count': 1,
                     'language': 'en',
                     'format': 'json'
-                },
-                timeout=10
+                }
             )
             response.raise_for_status()
 
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError) as json_err:
+            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
                 raise ValueError(f'Failed to parse geocoding response: {json_err}')
 
             if not data.get('results'):
@@ -54,8 +55,10 @@ class RegionalDataIntegration:
                 'country': result.get('country', ''),
                 'admin1': result.get('admin1', '')
             }
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             raise ValueError(f'Geocoding request failed: {e}')
+        except httpx.HTTPStatusError as e:
+            raise ValueError(f'Geocoding HTTP error: {e.response.status_code}')
         except (KeyError, IndexError) as e:
             raise ValueError(f'Invalid geocoding response format: {e}')
         except Exception as e:
@@ -111,10 +114,10 @@ class RegionalDataIntegration:
         """
         try:
             # Step 1: Geocode the location
-            coords = self._geocode_location(location)
+            coords = await self._geocode_location(location)
 
             # Step 2: Fetch weather data from Open-Meteo
-            response = requests.get(
+            response = await self.client.get(
                 self.open_meteo_url,
                 params={
                     'latitude': coords['latitude'],
@@ -123,15 +126,14 @@ class RegionalDataIntegration:
                     'hourly': 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code',
                     'timezone': 'auto',
                     'forecast_days': 3
-                },
-                timeout=15
+                }
             )
             response.raise_for_status()
 
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError) as json_err:
+            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
                 raise Exception(f'Failed to parse weather API response: {json_err}')
 
             if 'current' not in data or 'hourly' not in data:
@@ -197,21 +199,20 @@ class RegionalDataIntegration:
             return self._mock_agricultural_data(location, crop_type)
 
         try:
-            response = requests.get(
+            response = await self.client.get(
                 f"{self.agriculture_api_url}/crop-data",
                 params={
                     'location': location,
                     'crop': crop_type,
                     'api_key': self.agriculture_api_key
-                },
-                timeout=10
+                }
             )
             response.raise_for_status()
 
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError) as json_err:
+            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
                 print(f"Failed to parse agriculture API response: {json_err}")
                 return self._mock_agricultural_data(location, crop_type)
 
@@ -222,8 +223,11 @@ class RegionalDataIntegration:
                 'timestamp': datetime.now().isoformat()
             }
 
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             print(f"Agriculture API request error: {e}")
+            return self._mock_agricultural_data(location, crop_type)
+        except httpx.HTTPStatusError as e:
+            print(f"Agriculture API HTTP error: {e.response.status_code}")
             return self._mock_agricultural_data(location, crop_type)
         except Exception as e:
             print(f"Agriculture API error: {e}")
@@ -280,3 +284,9 @@ class RegionalDataIntegration:
             'message': 'Mock data - configure Agriculture API for real data',
             'timestamp': datetime.now().isoformat()
         }
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
