@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-AI Agent - Chat Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 900px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.assistant {
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            padding: 0 10px;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-container input:focus {
+            border-color: #667eea;
+        }
+
+        .input-container button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .input-container button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .input-container button:active {
+            transform: translateY(0);
+        }
+
+        .input-container button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .loading-dots {
+            display: inline-block;
+        }
+
+        .loading-dots span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            margin: 0 3px;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 10px 20px;
+            border-left: 4px solid #c62828;
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .welcome-message h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .welcome-message p {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .api-status {
+            font-size: 12px;
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .api-status.connected {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .api-status.disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        /* Scrollbar styling */
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Multi-AI Agent</h1>
+            <p>Powered by Gemini, Groq, and OpenRouter with real-time web search</p>
+            <div class="api-status" id="apiStatus">Checking API connection...</div>
+        </div>
+        
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <h2>👋 Welcome!</h2>
+                <p>Ask me anything - I can search the web, check weather, and provide agricultural insights.</p>
+                <p><strong>Try asking:</strong></p>
+                <p>"What's the weather in London?"</p>
+                <p>"Tell me about AI in agriculture"</p>
+                <p>"Search for latest farming techniques"</p>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <p>AI is thinking...</p>
+        </div>
+        
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="userInput" 
+                placeholder="Type your message here..." 
+                autocomplete="off"
+            >
+            <button id="sendButton" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration - Update this with your Render deployment URL
+        const API_BASE_URL = 'https://ai-agent-mak4.onrender.com';
+        
+        // Auto-detect API URL based on current host
+        function getApiUrl() {
+            // If running on GitHub Pages or localhost, use Render URL
+            if (window.location.hostname === 'gghhxx11299.github.io' || 
+                window.location.hostname === 'localhost' || 
+                window.location.hostname === '127.0.0.1') {
+                return API_BASE_URL;
+            }
+            // If running on same domain as API, use relative URL
+            return '';
+        }
+
+        const API_URL = getApiUrl();
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+        const apiStatus = document.getElementById('apiStatus');
+
+        // Check API connection on load
+        async function checkApiConnection() {
+            try {
+                const response = await fetch(`${API_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    apiStatus.textContent = '✓ API Connected';
+                    apiStatus.className = 'api-status connected';
+                } else {
+                    apiStatus.textContent = '⚠ API Unavailable';
+                    apiStatus.className = 'api-status disconnected';
+                }
+            } catch (error) {
+                apiStatus.textContent = '⚠ API Unavailable - Check your connection';
+                apiStatus.className = 'api-status disconnected';
+                console.error('API connection error:', error);
+            }
+        }
+
+        // Check API connection when page loads
+        checkApiConnection();
+
+        // Allow Enter key to send message
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        function addMessage(text, isUser) {
+            // Remove welcome message if it exists
+            const welcomeMsg = chatContainer.querySelector('.welcome-message');
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            
+            // Handle markdown-like formatting (basic)
+            if (!isUser) {
+                // Convert basic markdown to HTML
+                text = text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br>');
+                bubble.innerHTML = text;
+            } else {
+                bubble.textContent = text;
+            }
+            
+            const time = document.createElement('div');
+            time.className = 'message-time';
+            time.textContent = new Date().toLocaleTimeString();
+            
+            messageDiv.appendChild(bubble);
+            messageDiv.appendChild(time);
+            chatContainer.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = `Error: ${message}`;
+            chatContainer.appendChild(errorDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const query = userInput.value.trim();
+            
+            if (!query) {
+                return;
+            }
+
+            // Disable input and button
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            loading.classList.add('active');
+
+            // Add user message
+            addMessage(query, true);
+            userInput.value = '';
+
+            try {
+                const queryUrl = `${API_URL}/query`;
+                const response = await fetch(queryUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    addMessage(data.response, false);
+                } else {
+                    const errorMsg = data.error || 'Failed to get response from AI';
+                    showError(errorMsg);
+                    
+                    // If it's a connection error, update API status
+                    if (errorMsg.includes('Network') || errorMsg.includes('Failed to fetch')) {
+                        apiStatus.textContent = '⚠ API Unavailable';
+                        apiStatus.className = 'api-status disconnected';
+                    }
+                }
+            } catch (error) {
+                const errorMsg = error.message || 'Network error';
+                showError(`Network error: ${errorMsg}. Please check if the API is running at ${API_URL}`);
+                apiStatus.textContent = '⚠ API Unavailable';
+                apiStatus.className = 'api-status disconnected';
+            } finally {
+                // Re-enable input and button
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                loading.classList.remove('active');
+                userInput.focus();
+            }
+        }
+    </script>
+</body>
+</html>
+
