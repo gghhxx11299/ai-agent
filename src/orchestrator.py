@@ -169,7 +169,7 @@ class Orchestrator:
         Returns:
             Final synthesized answer from AI
         """
-        console.print(f"\n[blue]🤖 {self.ai_name} is thinking...[/blue]\n")
+        console.print(f"{self.ai_name} is thinking...")
 
         # Step 1: AI analyzes the query to determine what data sources are needed
         with console.status("Analyzing your question..."):
