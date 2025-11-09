@@ -156,81 +156,174 @@ def status():
 def query():
     """
     Process a query through the AI system
+    Compatible with MeshCore and standard API clients
 
     Request body:
     {
         "query": "Your question here"
     }
+    
+    Also accepts:
+    {
+        "message": "Your question here"
+    }
+    or
+    {
+        "input": "Your question here"
+    }
     """
     try:
         # Get JSON data
-        data = request.get_json()
+        data = request.get_json() or {}
+        
+        # Support multiple input field names for MeshCore compatibility
+        user_query = (
+            data.get('query') or 
+            data.get('message') or 
+            data.get('input') or 
+            data.get('text') or
+            ''
+        )
 
-        if not data or 'query' not in data:
+        if not user_query or not user_query.strip():
             return jsonify({
-                'error': 'Missing required field: query',
+                'success': False,
+                'error': 'Missing required field: query, message, or input',
                 'example': {
                     'query': 'What is the weather in London?'
                 }
             }), 400
 
-        user_query = data['query']
-
-        if not user_query or not user_query.strip():
-            return jsonify({
-                'error': 'Query cannot be empty'
-            }), 400
-
         # Process query
-        orch = get_orchestrator()
+        try:
+            orch = get_orchestrator()
+        except Exception as e:
+            logger.error(f"Failed to get orchestrator: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'AI service unavailable. Please configure API keys in environment variables.',
+                'message': str(e)
+            }), 503
 
         # Handle async properly for production (Flask/Gunicorn)
         try:
-            # Try to get existing event loop
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # Create new event loop if none exists
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        # Run async function
-        if loop.is_running():
-            # If loop is already running, we need to use a different approach
+            # Create new event loop for each request (safer for production)
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(
                     lambda: asyncio.run(orch.process_query(user_query))
                 )
                 response = future.result(timeout=120)
-        else:
-            response = loop.run_until_complete(orch.process_query(user_query))
+        except concurrent.futures.TimeoutError:
+            return jsonify({
+                'success': False,
+                'error': 'Request timeout - the query took too long to process',
+                'query': user_query
+            }), 504
+        except Exception as e:
+            logger.error(f"Query processing error: {e}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'error': 'Failed to process query',
+                'message': str(e),
+                'query': user_query
+            }), 500
 
+        # Return response in MeshCore-compatible format
         return jsonify({
             'success': True,
             'query': user_query,
             'response': response,
-            'ai_model': orch.ai_name
+            'answer': response,  # MeshCore compatibility
+            'message': response,  # MeshCore compatibility
+            'ai_model': orch.ai_name,
+            'timestamp': datetime.now().isoformat()
         }), 200
 
-    except asyncio.TimeoutError:
-        return jsonify({
-            'success': False,
-            'error': 'Request timeout - the query took too long to process',
-            'query': data.get('query', '') if data else ''
-        }), 504
     except Exception as e:
-        logger.error(f"Query error: {e}", exc_info=True)
+        logger.error(f"Query endpoint error: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e),
-            'query': data.get('query', '') if data else ''
+            'error': 'Internal server error',
+            'message': str(e)
         }), 500
 
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Alias for /query endpoint"""
+    """Alias for /query endpoint - MeshCore compatible"""
     return query()
+
+
+@app.route('/v1/chat', methods=['POST'])
+def chat_v1():
+    """MeshCore v1 API compatible endpoint"""
+    return query()
+
+
+@app.route('/v1/completions', methods=['POST'])
+def completions_v1():
+    """OpenAI-compatible completions endpoint for MeshCore"""
+    try:
+        data = request.get_json() or {}
+        user_query = data.get('prompt') or data.get('message') or data.get('query') or ''
+        
+        if not user_query:
+            return jsonify({
+                'error': {
+                    'message': 'Missing required field: prompt, message, or query',
+                    'type': 'invalid_request_error'
+                }
+            }), 400
+        
+        # Process query
+        try:
+            orch = get_orchestrator()
+        except Exception as e:
+            return jsonify({
+                'error': {
+                    'message': 'AI service unavailable',
+                    'type': 'service_error'
+                }
+            }), 503
+        
+        # Handle async
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                lambda: asyncio.run(orch.process_query(user_query))
+            )
+            response = future.result(timeout=120)
+        
+        # Return OpenAI-compatible format
+        return jsonify({
+            'id': f'chatcmpl-{datetime.now().timestamp()}',
+            'object': 'chat.completion',
+            'created': int(datetime.now().timestamp()),
+            'model': orch.ai_name,
+            'choices': [{
+                'index': 0,
+                'message': {
+                    'role': 'assistant',
+                    'content': response
+                },
+                'finish_reason': 'stop'
+            }],
+            'usage': {
+                'prompt_tokens': len(user_query.split()),
+                'completion_tokens': len(response.split()),
+                'total_tokens': len(user_query.split()) + len(response.split())
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Completions error: {e}", exc_info=True)
+        return jsonify({
+            'error': {
+                'message': str(e),
+                'type': 'internal_error'
+            }
+        }), 500
 
 
 @app.errorhandler(404)

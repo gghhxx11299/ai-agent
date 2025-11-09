@@ -17,3 +17,9 @@ services:
         sync: false
       - key: POE_API_KEY
         sync: false
+      - key: MESHCORE_API_KEY
+        sync: false
+      - key: MESHCORE_AGENT_ID
+        sync: false
+      - key: FLASK_ENV
+        value: production

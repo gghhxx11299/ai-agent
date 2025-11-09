@@ -41,8 +41,13 @@ class RegionalDataIntegration:
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
-                raise ValueError(f'Failed to parse geocoding response: {json_err}')
+            except (ValueError, json.JSONDecodeError) as json_err:
+                # Try to parse response text directly
+                response_text = response.text if hasattr(response, 'text') else str(response.content)
+                from src.utils.json_parser import safe_json_loads
+                data = safe_json_loads(response_text)
+                if not data:
+                    raise ValueError(f'Failed to parse geocoding response: {json_err}')
 
             if not data.get('results'):
                 raise ValueError(f'Location "{location}" not found')
@@ -135,8 +140,13 @@ class RegionalDataIntegration:
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
-                raise Exception(f'Failed to parse weather API response: {json_err}')
+            except (ValueError, json.JSONDecodeError) as json_err:
+                # Try to parse response text directly
+                response_text = response.text if hasattr(response, 'text') else str(response.content)
+                from src.utils.json_parser import safe_json_loads
+                data = safe_json_loads(response_text)
+                if not data:
+                    raise Exception(f'Failed to parse weather API response: {json_err}')
 
             if 'current' not in data or 'hourly' not in data:
                 raise Exception('Invalid weather API response format')
@@ -281,9 +291,15 @@ class RegionalDataIntegration:
             # Safe JSON parsing with EOF error handling
             try:
                 data = response.json()
-            except (ValueError, EOFError, json.JSONDecodeError) as json_err:
-                print(f"Failed to parse agriculture API response: {json_err}")
-                return self._mock_agricultural_data(location, crop_type)
+            except (ValueError, json.JSONDecodeError) as json_err:
+                # Try to parse response text directly
+                response_text = response.text if hasattr(response, 'text') else str(response.content)
+                from src.utils.json_parser import safe_json_loads
+                data = safe_json_loads(response_text)
+                if not data:
+                    import logging
+                    logging.warning(f"Failed to parse agriculture API response: {json_err}")
+                    return self._mock_agricultural_data(location, crop_type)
 
             return {
                 'success': True,

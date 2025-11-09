@@ -163,7 +163,15 @@ class WebSearchIntegration:
                     )
                     
                     if response.status_code == 200:
-                        data = response.json()
+                        # Safe JSON parsing
+                        try:
+                            data = response.json()
+                        except (ValueError, json.JSONDecodeError):
+                            # Try to parse as text
+                            response_text = response.text if hasattr(response, 'text') else str(response.content)
+                            from src.utils.json_parser import safe_json_loads
+                            data = safe_json_loads(response_text) or {}
+                        
                         # Parse Poe response - handle different response formats
                         text_response = ''
                         if isinstance(data, dict):

@@ -4,6 +4,7 @@ import json
 import re
 import google.generativeai as genai
 from config.config import Config
+from src.utils.json_parser import safe_json_loads, safe_extract_json_from_text
 
 
 class GeminiIntegration:
@@ -56,30 +57,35 @@ Return ONLY a JSON object in this exact format:
 
         try:
             response = self.model.generate_content(prompt)
-            text = response.text
+            text = response.text if hasattr(response, 'text') and response.text else str(response)
 
-            # Extract JSON from response (handling markdown code blocks)
-            json_match = re.search(r'\{[\s\S]*\}', text)
-            if json_match:
-                return json.loads(json_match.group(0))
+            # Safely parse JSON with EOF error handling
+            parsed_json = safe_extract_json_from_text(text)
+            if parsed_json:
+                return parsed_json
 
-            return json.loads(text)
+            # Fallback to safe JSON parsing
+            parsed_json = safe_json_loads(text)
+            if parsed_json:
+                return parsed_json
 
         except Exception as e:
-            print(f"Error analyzing query: {e}")
-            # Return default analysis if parsing fails
-            return {
-                "intent": query,
-                "needsWebSearch": "latest" in query.lower() or "recent" in query.lower(),
-                "needsWeatherData": False,
-                "needsAgriculturalData": False,
-                "needsCodeGeneration": False,
-                "codeType": None,
-                "location": None,
-                "timeframe": None,
-                "searchKeywords": [w for w in query.split() if len(w) > 3][:5],
-                "requiresCurrentData": False,
-            }
+            import logging
+            logging.warning(f"Error analyzing query with Gemini: {e}")
+        
+        # Return default analysis if parsing fails
+        return {
+            "intent": query,
+            "needsWebSearch": "latest" in query.lower() or "recent" in query.lower() or "current" in query.lower(),
+            "needsWeatherData": any(word in query.lower() for word in ['weather', 'temperature', 'rain', 'forecast', 'climate']),
+            "needsAgriculturalData": any(word in query.lower() for word in ['crop', 'farm', 'agriculture', 'soil', 'planting']),
+            "needsCodeGeneration": any(word in query.lower() for word in ['code', 'script', 'generate', 'python', 'pyqgis']),
+            "codeType": 'pyqgis' if 'pyqgis' in query.lower() or 'qgis' in query.lower() else ('python' if 'python' in query.lower() else None),
+            "location": None,
+            "timeframe": None,
+            "searchKeywords": [w for w in query.split() if len(w) > 3][:5],
+            "requiresCurrentData": False,
+        }
 
     async def synthesize_response(self, query: str, data: dict) -> str:
         """
@@ -146,10 +152,13 @@ Provide your response in a natural, friendly way:"""
 
         try:
             response = self.model.generate_content(prompt)
-            return response.text
+            if hasattr(response, 'text') and response.text:
+                return response.text
+            return str(response)
         except Exception as e:
-            print(f"Error synthesizing response: {e}")
-            return f"I encountered an error while processing your query: {e}"
+            import logging
+            logging.error(f"Error synthesizing response with Gemini: {e}")
+            return f"I encountered an error while processing your query. Please try again or rephrase your question."
 
     async def answer_directly(self, query: str) -> str:
         """
@@ -171,7 +180,10 @@ Your response:"""
 
         try:
             response = self.model.generate_content(prompt)
-            return response.text
+            if hasattr(response, 'text') and response.text:
+                return response.text
+            return str(response)
         except Exception as e:
-            print(f"Error in direct answer: {e}")
-            return f"I'm sorry, I encountered an error while processing your question: {e}"
+            import logging
+            logging.error(f"Error in direct answer with Gemini: {e}")
+            return f"I'm sorry, I encountered an error while processing your question. Please try again."

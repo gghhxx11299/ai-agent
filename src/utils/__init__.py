@@ -1,1 +1,1 @@
-"""Utilities package"""
+"""Utilities package for Multi-AI Agent"""
