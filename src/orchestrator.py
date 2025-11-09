@@ -57,8 +57,18 @@ class Orchestrator:
         else:
             raise Exception("No AI models available. Please configure at least one API key (Gemini, Groq, or OpenRouter)")
 
-        self.web_search = WebSearchIntegration()  # Uses DuckDuckGo for real-time web search
+        self.web_search = WebSearchIntegration()  # Uses Poe, DuckDuckGo, and Wikipedia with fallbacks
         self.regional_data = RegionalDataIntegration()
+        
+    async def cleanup(self):
+        """Clean up resources (close HTTP clients)"""
+        if hasattr(self.regional_data, 'client'):
+            await self.regional_data.client.aclose()
+        if hasattr(self.web_search, 'client'):
+            await self.web_search.client.aclose()
+        for name, ai_instance in self.ai_models:
+            if hasattr(ai_instance, 'client'):
+                await ai_instance.client.aclose()
 
     async def _safe_ai_call(self, method_name: str, *args, **kwargs):
         """
@@ -168,7 +178,7 @@ The script is fully commented and ready to use. Would you like me to explain any
             'sources': {}
         }
 
-        # Fetch web search results if needed (DuckDuckGo for real-time data)
+        # Fetch web search results if needed (Poe -> DuckDuckGo -> Wikipedia -> Mock fallback chain)
         if analysis.get('needsWebSearch'):
             keywords = analysis.get('searchKeywords', analysis.get('keywords', [query]))
             with console.status(f"🔍 Searching the web for: {', '.join(keywords)}..."):
@@ -176,8 +186,15 @@ The script is fully commented and ready to use. Would you like me to explain any
                     search_results = await self.web_search.search(query, keywords)
                     aggregated_data['sources']['webSearch'] = search_results
 
+                    source = search_results.get('source', 'unknown')
                     if search_results.get('mock'):
-                        console.print("[yellow]⚠️  Using mock web search (install 'ddgs' package for real results: pip install ddgs)[/yellow]")
+                        console.print("[yellow]⚠️  Using mock web search (configure search providers for real results)[/yellow]")
+                    elif source == 'poe':
+                        console.print("[green]✓[/green] Found information via Poe Web-Search")
+                    elif source == 'duckduckgo':
+                        console.print("[green]✓[/green] Found information via DuckDuckGo")
+                    elif source == 'wikipedia':
+                        console.print("[green]✓[/green] Found information via Wikipedia")
                     else:
                         console.print("[green]✓[/green] Found up-to-date information")
                 except Exception as e:

@@ -23,7 +23,13 @@ class Config:
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
     OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-3.5-sonnet')
 
-    # Web Search Configuration (DuckDuckGo - free, no API key required)
+    # Web Search Configuration
+    # Poe API Configuration (Web Search Bot)
+    POE_API_KEY = os.getenv('POE_API_KEY')
+    POE_BOT_NAME = os.getenv('POE_BOT_NAME', 'Web-Search')  # Poe bot for web search
+    POE_API_URL = 'https://api.poe.com/bot/'
+    
+    # DuckDuckGo - free, no API key required (fallback)
     # Automatically enabled when duckduckgo-search is installed
 
     # Weather Configuration (Open-Meteo - free, no API key required)

@@ -4,14 +4,14 @@ REST API for Multi-AI Agent System
 Exposes endpoints for testing with Thunder Client or Postman
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import asyncio
 import os
 from src.orchestrator import Orchestrator
 from config.config import validate_config
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 CORS(app)  # Enable CORS for all routes
 
 # Initialize orchestrator
@@ -28,7 +28,13 @@ def get_orchestrator():
 
 @app.route('/', methods=['GET'])
 def home():
-    """Health check and API information"""
+    """Serve the HTML frontend"""
+    return render_template('index.html')
+
+
+@app.route('/api', methods=['GET'])
+def api_info():
+    """API information endpoint"""
     return jsonify({
         'status': 'online',
         'service': 'Multi-AI Agent System',
@@ -39,7 +45,8 @@ def home():
             'fallback_2': 'OpenRouter (claude-3.5-sonnet)'
         },
         'endpoints': {
-            'GET /': 'API information',
+            'GET /': 'HTML frontend',
+            'GET /api': 'API information',
             'GET /health': 'Health check',
             'POST /query': 'Send a query to the AI',
             'POST /chat': 'Chat with the AI (alias for /query)',

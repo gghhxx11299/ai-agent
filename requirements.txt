@@ -4,8 +4,9 @@ groq>=0.4.0                 # Groq (Fallback AI #1)
 httpx>=0.24.0               # Async HTTP client for API calls
 python-dotenv>=1.0.0        # Environment configuration
 
-# Web Search (Free - No API key needed!)
+# Web Search (Multiple options with fallbacks)
 ddgs>=1.0.0                 # DuckDuckGo web search (renamed package)
+wikipedia>=1.4.0            # Wikipedia API for fallback search
 
 # Web API (Flask)
 Flask>=3.0.0                # Web framework for REST API
