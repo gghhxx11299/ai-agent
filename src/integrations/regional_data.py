@@ -104,28 +104,30 @@ class RegionalDataIntegration:
 
     async def get_weather_data(self, location: str) -> dict:
         """
-        Fetch weather data for a location using Open-Meteo
+        Fetch comprehensive weather data including rainfall from Open-Meteo
 
         Args:
             location: City name or coordinates
 
         Returns:
-            Dictionary with weather data
+            Dictionary with weather data including detailed rainfall information
         """
         try:
             # Step 1: Geocode the location
             coords = await self._geocode_location(location)
 
-            # Step 2: Fetch weather data from Open-Meteo
+            # Step 2: Fetch comprehensive weather data from Open-Meteo
+            # Including hourly and daily precipitation data
             response = await self.client.get(
                 self.open_meteo_url,
                 params={
                     'latitude': coords['latitude'],
                     'longitude': coords['longitude'],
-                    'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl',
-                    'hourly': 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code',
+                    'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl',
+                    'hourly': 'temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m',
+                    'daily': 'temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,showers_sum,snowfall_sum,precipitation_hours,precipitation_probability_max,weather_code',
                     'timezone': 'auto',
-                    'forecast_days': 3
+                    'forecast_days': 7
                 }
             )
             response.raise_for_status()
@@ -141,17 +143,57 @@ class RegionalDataIntegration:
 
             current = data['current']
             hourly = data['hourly']
+            daily = data.get('daily', {})
 
-            # Get next 8 hours of forecast
-            forecast_data = []
-            for i in range(min(8, len(hourly['time']))):
-                forecast_data.append({
+            # Process hourly forecast (next 24 hours)
+            hourly_forecast = []
+            for i in range(min(24, len(hourly['time']))):
+                hourly_forecast.append({
                     'datetime': hourly['time'][i],
                     'temp': hourly['temperature_2m'][i],
                     'description': self._get_weather_description(hourly['weather_code'][i]),
                     'humidity': hourly['relative_humidity_2m'][i],
-                    'precipitation': hourly.get('precipitation_probability', [0])[i] if i < len(hourly.get('precipitation_probability', [])) else 0
+                    'precipitation': hourly.get('precipitation', [0])[i] if i < len(hourly.get('precipitation', [])) else 0,
+                    'precipitation_probability': hourly.get('precipitation_probability', [0])[i] if i < len(hourly.get('precipitation_probability', [])) else 0,
+                    'rain': hourly.get('rain', [0])[i] if i < len(hourly.get('rain', [])) else 0,
+                    'showers': hourly.get('showers', [0])[i] if i < len(hourly.get('showers', [])) else 0,
+                    'snowfall': hourly.get('snowfall', [0])[i] if i < len(hourly.get('snowfall', [])) else 0,
+                    'wind_speed': hourly.get('wind_speed_10m', [0])[i] if i < len(hourly.get('wind_speed_10m', [])) else 0
                 })
+
+            # Process daily forecast (next 7 days)
+            daily_forecast = []
+            if daily and 'time' in daily:
+                for i in range(min(7, len(daily['time']))):
+                    daily_forecast.append({
+                        'date': daily['time'][i],
+                        'temp_max': daily.get('temperature_2m_max', [0])[i] if i < len(daily.get('temperature_2m_max', [])) else 0,
+                        'temp_min': daily.get('temperature_2m_min', [0])[i] if i < len(daily.get('temperature_2m_min', [])) else 0,
+                        'precipitation_sum': daily.get('precipitation_sum', [0])[i] if i < len(daily.get('precipitation_sum', [])) else 0,
+                        'rain_sum': daily.get('rain_sum', [0])[i] if i < len(daily.get('rain_sum', [])) else 0,
+                        'showers_sum': daily.get('showers_sum', [0])[i] if i < len(daily.get('showers_sum', [])) else 0,
+                        'snowfall_sum': daily.get('snowfall_sum', [0])[i] if i < len(daily.get('snowfall_sum', [])) else 0,
+                        'precipitation_hours': daily.get('precipitation_hours', [0])[i] if i < len(daily.get('precipitation_hours', [])) else 0,
+                        'precipitation_probability_max': daily.get('precipitation_probability_max', [0])[i] if i < len(daily.get('precipitation_probability_max', [])) else 0,
+                        'weather_code': daily.get('weather_code', [0])[i] if i < len(daily.get('weather_code', [])) else 0,
+                        'description': self._get_weather_description(daily.get('weather_code', [0])[i] if i < len(daily.get('weather_code', [])) else 0)
+                    })
+
+            # Calculate rainfall statistics
+            current_precipitation = current.get('precipitation', 0)
+            current_rain = current.get('rain', 0)
+            current_showers = current.get('showers', 0)
+            current_snowfall = current.get('snowfall', 0)
+            
+            # Total precipitation for today
+            today_precipitation = sum([h.get('precipitation', 0) for h in hourly_forecast[:24]])
+            today_rain = sum([h.get('rain', 0) for h in hourly_forecast[:24]])
+            today_showers = sum([h.get('showers', 0) for h in hourly_forecast[:24]])
+            
+            # Next 24 hours precipitation forecast
+            next_24h_precipitation = sum([h.get('precipitation', 0) for h in hourly_forecast])
+            next_24h_rain = sum([h.get('rain', 0) for h in hourly_forecast])
+            next_24h_showers = sum([h.get('showers', 0) for h in hourly_forecast])
 
             return {
                 'success': True,
@@ -167,20 +209,47 @@ class RegionalDataIntegration:
                     'pressure': current['pressure_msl'],
                     'description': self._get_weather_description(current['weather_code']),
                     'windSpeed': current['wind_speed_10m'],
-                    'precipitation': current.get('precipitation', 0)
+                    'windDirection': current.get('wind_direction_10m', 0),
+                    'precipitation': current_precipitation,
+                    'rain': current_rain,
+                    'showers': current_showers,
+                    'snowfall': current_snowfall
                 },
-                'forecast': forecast_data,
+                'rainfall': {
+                    'current': {
+                        'precipitation': current_precipitation,
+                        'rain': current_rain,
+                        'showers': current_showers,
+                        'snowfall': current_snowfall
+                    },
+                    'today': {
+                        'total_precipitation': round(today_precipitation, 2),
+                        'total_rain': round(today_rain, 2),
+                        'total_showers': round(today_showers, 2),
+                        'unit': 'mm'
+                    },
+                    'next_24h': {
+                        'forecasted_precipitation': round(next_24h_precipitation, 2),
+                        'forecasted_rain': round(next_24h_rain, 2),
+                        'forecasted_showers': round(next_24h_showers, 2),
+                        'unit': 'mm'
+                    }
+                },
+                'hourly_forecast': hourly_forecast,
+                'daily_forecast': daily_forecast,
                 'source': 'Open-Meteo',
                 'timestamp': datetime.now().isoformat()
             }
 
         except Exception as e:
-            print(f"Weather API error: {e}")
+            import traceback
+            error_msg = str(e)
+            # Don't print in production, just return error
             return {
                 'success': False,
-                'error': str(e),
+                'error': error_msg,
                 'location': location,
-                'message': f'Unable to fetch weather data for "{location}". {e}'
+                'message': f'Unable to fetch weather data for "{location}". {error_msg}'
             }
 
     async def get_agricultural_data(self, location: str, crop_type: str = None) -> dict:

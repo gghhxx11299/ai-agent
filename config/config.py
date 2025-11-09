@@ -46,20 +46,39 @@ class Config:
 
 
 def validate_config():
-    """Validate required configuration"""
+    """Validate required configuration (non-blocking in production)"""
+    import os
     has_ai_key = Config.GEMINI_API_KEY or Config.GROQ_API_KEY or Config.OPENROUTER_API_KEY
 
     if not has_ai_key:
-        print("❌ Error: No AI API keys configured")
-        print("\nPlease configure at least one of the following:")
-        print("\n  Option 1 - Gemini (Recommended - FREE):")
-        print("    1. Get API key from: https://makersuite.google.com/app/apikey")
-        print("    2. Add to .env: GEMINI_API_KEY=your_key_here")
-        print("\n  Option 2 - Groq (Fast & Free):")
-        print("    1. Get API key from: https://console.groq.com/keys")
-        print("    2. Add to .env: GROQ_API_KEY=your_key_here")
-        print("\n  Option 3 - OpenRouter (Multiple Models):")
-        print("    1. Get API key from: https://openrouter.ai/keys")
-        print("    2. Add to .env: OPENROUTER_API_KEY=your_key_here")
-        print("\n  You can configure multiple keys for automatic fallback!")
-        sys.exit(1)
+        error_msg = "❌ Error: No AI API keys configured"
+        instructions = """
+Please configure at least one of the following:
+
+  Option 1 - Gemini (Recommended - FREE):
+    1. Get API key from: https://makersuite.google.com/app/apikey
+    2. Add to .env: GEMINI_API_KEY=your_key_here
+
+  Option 2 - Groq (Fast & Free):
+    1. Get API key from: https://console.groq.com/keys
+    2. Add to .env: GROQ_API_KEY=your_key_here
+
+  Option 3 - OpenRouter (Multiple Models):
+    1. Get API key from: https://openrouter.ai/keys
+    2. Add to .env: OPENROUTER_API_KEY=your_key_here
+
+  You can configure multiple keys for automatic fallback!
+"""
+        # In production, just log warning instead of exiting
+        is_production = (
+            os.environ.get('FLASK_ENV') == 'production' or 
+            os.environ.get('RENDER') is not None or
+            os.environ.get('PORT') is not None
+        )
+        
+        if is_production:
+            import logging
+            logging.warning(error_msg + instructions)
+        else:
+            print(error_msg + instructions)
+            sys.exit(1)

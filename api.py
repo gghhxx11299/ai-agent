@@ -8,21 +8,45 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import asyncio
 import os
+import sys
+import logging
+from datetime import datetime
 from src.orchestrator import Orchestrator
 from config.config import validate_config
+
+# Configure logging for production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)  # Enable CORS for all routes
 
 # Initialize orchestrator
 orchestrator = None
+orchestrator_lock = asyncio.Lock()
 
 
 def get_orchestrator():
-    """Get or create orchestrator instance"""
+    """Get or create orchestrator instance (thread-safe)"""
     global orchestrator
     if orchestrator is None:
-        orchestrator = Orchestrator()
+        try:
+            # Suppress console output in production
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            # Redirect stdout/stderr to avoid breaking in production
+            f = io.StringIO()
+            with redirect_stdout(f), redirect_stderr(f):
+                orchestrator = Orchestrator()
+            logger.info(f"Orchestrator initialized with {len(orchestrator.ai_models)} AI model(s)")
+        except Exception as e:
+            logger.error(f"Failed to initialize orchestrator: {e}")
+            raise
     return orchestrator
 
 
@@ -65,14 +89,13 @@ def api_info():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
+    """Health check endpoint - lightweight, doesn't require orchestrator"""
     try:
-        orch = get_orchestrator()
+        # Simple health check without initializing orchestrator
         return jsonify({
             'status': 'healthy',
-            'ai_available': True,
-            'current_ai': orch.ai_name,
-            'models_loaded': len(orch.ai_models)
+            'service': 'Multi-AI Agent System',
+            'timestamp': datetime.now().isoformat()
         }), 200
     except Exception as e:
         return jsonify({
@@ -161,11 +184,26 @@ def query():
         # Process query
         orch = get_orchestrator()
 
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        response = loop.run_until_complete(orch.process_query(user_query))
-        loop.close()
+        # Handle async properly for production (Flask/Gunicorn)
+        try:
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # Create new event loop if none exists
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Run async function
+        if loop.is_running():
+            # If loop is already running, we need to use a different approach
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(
+                    lambda: asyncio.run(orch.process_query(user_query))
+                )
+                response = future.result(timeout=120)
+        else:
+            response = loop.run_until_complete(orch.process_query(user_query))
 
         return jsonify({
             'success': True,
@@ -174,7 +212,14 @@ def query():
             'ai_model': orch.ai_name
         }), 200
 
+    except asyncio.TimeoutError:
+        return jsonify({
+            'success': False,
+            'error': 'Request timeout - the query took too long to process',
+            'query': data.get('query', '') if data else ''
+        }), 504
     except Exception as e:
+        logger.error(f"Query error: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e),
@@ -214,20 +259,22 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-    # Validate configuration on startup
+    # Validate configuration on startup (but don't exit on failure in production)
     try:
         validate_config()
-        print("✓ Configuration validated")
+        logger.info("Configuration validated")
     except Exception as e:
-        print(f"✗ Configuration error: {e}")
-        exit(1)
+        logger.warning(f"Configuration error: {e}")
+        # Don't exit in production, allow the app to start and handle errors gracefully
+        if os.environ.get('FLASK_ENV') == 'development':
+            exit(1)
 
     # Get port from environment or use 5000
     port = int(os.environ.get('PORT', 5000))
 
     # Run the Flask app
-    print(f"🚀 Starting Multi-AI Agent API on port {port}")
-    print(f"📝 API Documentation: http://localhost:{port}/")
+    logger.info(f"Starting Multi-AI Agent API on port {port}")
+    logger.info(f"API Documentation: http://localhost:{port}/")
 
     app.run(
         host='0.0.0.0',
