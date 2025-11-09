@@ -332,10 +332,13 @@ def not_found(error):
     return jsonify({
         'error': 'Endpoint not found',
         'available_endpoints': {
-            'GET /': 'API information',
+            'GET /': 'HTML frontend',
+            'GET /api': 'API information',
             'GET /health': 'Health check',
-            'POST /query': 'Send a query',
+            'POST /query': 'Send a query (MeshCore compatible)',
             'POST /chat': 'Chat (alias)',
+            'POST /v1/chat': 'MeshCore v1 API',
+            'POST /v1/completions': 'OpenAI-compatible completions',
             'GET /models': 'List models',
             'GET /status': 'System status'
         }
